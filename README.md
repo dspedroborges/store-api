@@ -1,4 +1,4 @@
-![Banner](./banner.png)
+![Banner](banner.png)
 
 # Store API
 
@@ -18,7 +18,7 @@ The database schema includes the following models:
 - **Reviews** – manage user reviews and approval workflow.
 - **TransactionStatus** – enum defining possible transaction states.
 
-![DB Diagram](./diagram.png)
+![DB_Diagram](diagram.png)
 
 ---
 
