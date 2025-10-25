@@ -1,3 +1,5 @@
+![Banner](banner.png)
+
 # Store API
 
 ## Project Description
@@ -15,6 +17,8 @@ The database schema includes the following models:
 - **Transactions** – track user purchases and their statuses.
 - **Reviews** – manage user reviews and approval workflow.
 - **TransactionStatus** – enum defining possible transaction states.
+
+![DB Diagram](diagram.png)
 
 ---
 
