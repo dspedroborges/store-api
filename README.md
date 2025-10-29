@@ -30,6 +30,7 @@ The database schema includes the following models:
 - **Pagination** support for large datasets
 - **Password recovery workflow**
 - **Logging** of requests for monitoring
+- **CRON Job** to cleanup revoked tokens every sunday
 
 ---
 

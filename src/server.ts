@@ -8,6 +8,7 @@ import productImagesRoutes from "./routes/product_images";
 import discountsRoutes from "./routes/discounts";
 import authRoutes from "./routes/auth";
 import { log } from "./middleware/log";
+import "./jobs/cleanupRevokedTokens.ts";
 
 dotenv.config();
 
