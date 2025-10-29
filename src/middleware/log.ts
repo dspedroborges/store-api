@@ -10,9 +10,9 @@ export async function log(req: Request, res: Response, next: NextFunction) {
 
   console.log("User IP:", ip);
 
-  await prisma.log.create({
+  await prisma.logs.create({
     data: {
-      ip,
+      ip: String(ip),
       path: req.path,
       method: req.method,
       createdAt: new Date(),

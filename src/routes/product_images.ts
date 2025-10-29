@@ -2,7 +2,6 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../utils/prisma";
 import { authenticate, AuthenticatedRequest } from "../middleware/authenticate";
 import multer from "multer";
-import path from "path";
 
 const router = Router();
 

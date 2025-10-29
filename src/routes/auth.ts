@@ -23,14 +23,14 @@ router.post("/signup", async (req: Request, res: Response) => {
             return res.status(401).json({ error: "Email already taken" });
         }
 
-        const passwordEncrypted = encryptPassword(password);
+        const passwordEncrypted = await encryptPassword(password);
 
         const user = await prisma.users.create({
             data: { name, email, password: passwordEncrypted, is_admin: false },
         });
 
-        const token = generateToken({ userId: user.id, refresh: false });
-        const refreshToken = generateToken({ userId: user.id, refresh: true });
+        const token = await generateToken({ userId: user.id, refresh: false });
+        const refreshToken = await generateToken({ userId: user.id, refresh: true });
 
         res.status(201).json({ token, refreshToken });
     } catch (error) {
@@ -53,6 +53,10 @@ router.post("/signin", async (req: Request, res: Response) => {
             }
         });
 
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
         const verifyPassword = await checkEncryptedPassword(password, user.password);
 
         if (!verifyPassword) {
@@ -73,7 +77,7 @@ router.post("/refresh-token", async (req: Request, res: Response) => {
     try {
         const { refreshToken } = req.body;
 
-        const isTokenRevoked = await prisma.revokedToken.findUnique({
+        const isTokenRevoked = await prisma.revokedTokens.findUnique({
             where: {
                 token: refreshToken
             }
@@ -93,14 +97,14 @@ router.post("/refresh-token", async (req: Request, res: Response) => {
             return res.status(401).json({ error: "Invalid token" });
         }
 
-        await prisma.revokedToken.create({
+        await prisma.revokedTokens.create({
             data: {
                 token: refreshToken
             }
         });
 
-        const token = generateToken({ userId: verifiedToken.data.userId, refresh: false });
-        const newRefreshToken = generateToken({ userId: verifiedToken.data.userId, refresh: true });
+        const token = await generateToken({ userId: verifiedToken.data.userId, refresh: false });
+        const newRefreshToken = await generateToken({ userId: verifiedToken.data.userId, refresh: true });
 
         res.status(201).json({ token, newRefreshToken });
     } catch (error) {
@@ -123,7 +127,7 @@ router.post("/password-recovery", async (req: Request, res: Response) => {
             return res.status(404).json({ error: "User not found" });
         }
 
-        await prisma.passwordRecovery.create({
+        await prisma.passwordRecoveries.create({
             data: {
                 token: uuidv4(),
                 userId: user.id,
