@@ -4,7 +4,7 @@
 
 ## Project Description
 
-**Store API** is a backend service built with **Express.js** and **TypeScript** to manage an online store. It provides endpoints for users, products, transactions, reviews, discounts, and product images. The API uses **Prisma ORM** to interact with a **PostgreSQL** database, supporting features like authentication, authorization, and file uploads.
+**Store API** is a backend service built with Express.js and TypeScript to manage an online store. It provides endpoints for users, products, transactions, reviews, discounts, and product images, as well as for processing payments through **Mercado Pago** (only Pix for now). The API uses Prisma ORM to interact with a PostgreSQL database, supporting features like authentication, authorization, and file uploads.
 
 The database schema includes the following models:
 - **Users** – manages users and admin privileges.
@@ -42,6 +42,8 @@ The database schema includes the following models:
 - **bcryptjs** for password hashing
 - **Multer** for file uploads
 - **ts-node-dev** for development
+- **node-cron** for cron jobs
+- **Mercado Pago** to process payments
 
 ---
 
@@ -56,6 +58,7 @@ The database schema includes the following models:
 - `DATABASE_URL` – PostgreSQL connection string
 - `JWT_SECRET` – secret key for signing JWT tokens
 - `PORT` – the port where the server is going to run
+- `MERCADOPAGO_ACCESS_TOKEN` - access token to process MP payments
 
 ---
 
