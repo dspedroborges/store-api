@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
-const jwt = require("jsonwebtoken");
+import jwt, { JwtPayload } from "jsonwebtoken";
 
-const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
+const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY || "123";
 
 export async function generateToken(
     data: { userId: string | number; refresh: boolean },
@@ -21,12 +21,16 @@ export async function generateToken(
     return token;
 }
 
-export async function verifyToken(token: string) {
+interface TokenPayload extends JwtPayload {
+    userId: string;
+}
+
+export async function verifyToken(token: string): Promise<{ valid: boolean; data: TokenPayload | null; message?: any }> {
     try {
-        const data = jwt.verify(token, JWT_SECRET_KEY);
+        const data = jwt.verify(token, JWT_SECRET_KEY) as TokenPayload;
         return { valid: true, data };
-    } catch (error: any) {
-        return { valid: false, error: error.message };
+    } catch (message: any) {
+        return { valid: false, data: null, message };
     }
 }
 

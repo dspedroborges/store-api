@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from "express";
-import { verifyToken } from "../utils/auth";
-import { prisma } from "../utils/prisma";
+import { type Request, type Response, type NextFunction } from "express";
+import { verifyToken } from "../utils/auth.js";
+import { prisma } from "../utils/prisma.js";
 
 export interface AuthenticatedRequest extends Request {
   authenticatedUserId?: number;
@@ -8,27 +8,47 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export async function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Bearer <token>
+  const token = req.cookies?.accessToken;
 
-  if (!token) return res.sendStatus(401);
+  if (!token) return res.status(401).json({ message: "Token not provided" });
 
   const decoded = await verifyToken(token);
-  
-  if (!decoded.valid) return res.sendStatus(401);
+
+  if (!decoded.valid || decoded.data == null) return res.status(401).json({ message: "Invalid token" });
 
   const user = await prisma.users.findUnique({
-    where: {
-      id: decoded.data.userId
+    where: { id: Number(decoded.data.userId) },
+    include: {
+      role: true,
     }
   });
 
-  if (!user) return res.sendStatus(404);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  if (!user.role) return res.status(404).json({ message: "Not a valid role" });
 
-  if (user.is_admin) {
-    req.isAdmin = true;
+  const hasPermission = await prisma.permissions.findFirst({
+    where: {
+      roleId: user.role?.id,
+      method: req.method,
+      route: req.route,
+    }
+  });
+
+  if (!hasPermission) return res.status(403).json({ message: "Forbidden" });
+
+  req.authenticatedUserId = user.id;
+
+  if (req.method !== "GET") {
+    await prisma.logs.create({
+      data: {
+        userId: user.id,
+        path: req.path,
+        method: req.method,
+        createdAt: new Date(),
+        ip: req.ip || "0.0.0.0"
+      },
+    });
   }
 
-  req.authenticatedUserId = decoded.data.id;
   next();
 }

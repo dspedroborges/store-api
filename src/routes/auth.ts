@@ -1,146 +1,193 @@
-import { Router, Request, Response } from "express";
-import { prisma } from "../utils/prisma";
-import { checkEncryptedPassword, encryptPassword, generateToken, verifyToken } from "../utils/auth";
-import { v4 as uuidv4 } from 'uuid';
+import { Router, type Request, type Response } from "express";
+import { prisma } from "../utils/prisma.js";
+import { checkEncryptedPassword, encryptPassword, generateToken, verifyToken } from "../utils/auth.js";
+import { v4 as uuidv4 } from "uuid";
+import { authenticate, type AuthenticatedRequest } from "../middleware/authenticate.js";
+import rateLimit from "express-rate-limit";
 
 const router = Router();
 
-router.post("/signup", async (req: Request, res: Response) => {
-    try {
-        const { name, email, password } = req.body;
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 min
+    max: 5,
+    message: "Too many attempts, please try again later",
+});
 
-        if (!name || !email || !password) {
-            return res.status(400).json({ error: "Name, email or password is missing" });
+router.get("/verify-token", authenticate, async (req: AuthenticatedRequest, res) => {
+    return res.sendStatus(201);
+});
+
+router.post("/sign-up", async (req: Request, res: Response) => {
+    try {
+        const { username, password, type } = req.body;
+
+        if (!username || !password) {
+            return res.status(400).json({ message: "Username or password is missing" });
         }
 
-        const isEmailTaken = await prisma.users.findUnique({
-            where: {
-                email
-            }
+        const isUsernameTaken = await prisma.users.findUnique({
+            where: { username },
         });
 
-        if (isEmailTaken) {
-            return res.status(401).json({ error: "Email already taken" });
+        if (isUsernameTaken) {
+            return res.status(401).json({ message: "Username already registered" });
         }
 
-        const passwordEncrypted = await encryptPassword(password);
+        const encryptedPassword = await encryptPassword(password);
 
         const user = await prisma.users.create({
-            data: { name, email, password: passwordEncrypted, is_admin: false },
+            data: {
+                username,
+                password: encryptedPassword,
+            },
         });
 
         const token = await generateToken({ userId: user.id, refresh: false });
         const refreshToken = await generateToken({ userId: user.id, refresh: true });
 
-        res.status(201).json({ token, refreshToken });
+        res
+            .cookie("accessToken", token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production", // só https em prod
+                sameSite: "lax",
+                maxAge: 60 * 60 * 1000, // 1 hora
+            })
+            .cookie("refreshToken", refreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+            })
+            .status(201)
+            .json({ message: "User created successfully" });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error when trying to create user" });
+        res.status(500).json({ message: "Error creating user" });
     }
 });
 
-router.post("/signin", async (req: Request, res: Response) => {
+router.post("/sign-in", limiter, async (req: Request, res: Response) => {
     try {
-        const { email, password } = req.body;
+        const { username, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ error: "Email or password is missing" });
+        if (!username || !password) {
+            return res.status(400).json({ message: "Username or password is missing" });
         }
 
         const user = await prisma.users.findUnique({
-            where: {
-                email
-            }
+            where: { username },
         });
 
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.status(404).json({ message: "User not found" });
         }
 
         const verifyPassword = await checkEncryptedPassword(password, user.password);
-
         if (!verifyPassword) {
-            return res.status(400).json({ error: "Invalid credentials" });
+            return res.status(400).json({ message: "Invalid credentials" });
         }
 
         const token = await generateToken({ userId: user.id, refresh: false });
         const refreshToken = await generateToken({ userId: user.id, refresh: true });
 
-        res.status(201).json({ token, refreshToken });
+        res
+            .cookie("accessToken", token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                maxAge: 60 * 60 * 1000, // 1 hour
+            })
+            .cookie("refreshToken", refreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            })
+            .status(200)
+            .json({ message: "Login successful" });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error when trying to create user" });
+        res.status(500).json({ message: "Error signing in" });
     }
 });
 
-router.post("/refresh-token", async (req: Request, res: Response) => {
+router.post("/refresh-token", limiter, async (req: Request, res: Response) => {
     try {
-        const { refreshToken } = req.body;
+        const refreshToken = req.cookies?.refreshToken;
+
+        if (!refreshToken) {
+            return res.status(401).json({ message: "Refresh token is required" });
+        }
 
         const isTokenRevoked = await prisma.revokedTokens.findUnique({
-            where: {
-                token: refreshToken
-            }
+            where: { token: refreshToken },
         });
 
         if (isTokenRevoked) {
-            return res.status(401).json({ error: "Token revoked" });
-        }
-
-        if (!refreshToken) {
-            return res.status(401).json({ error: "Refresh token must be provided" });
+            return res.status(401).json({ message: "Token revoked" });
         }
 
         const verifiedToken = await verifyToken(refreshToken);
-
-        if (!verifiedToken) {
-            return res.status(401).json({ error: "Invalid token" });
+        if (!verifiedToken || verifiedToken.data == null) {
+            return res.status(401).json({ message: "Invalid token" });
         }
 
         await prisma.revokedTokens.create({
-            data: {
-                token: refreshToken
-            }
+            data: { token: refreshToken },
         });
 
         const token = await generateToken({ userId: verifiedToken.data.userId, refresh: false });
         const newRefreshToken = await generateToken({ userId: verifiedToken.data.userId, refresh: true });
 
-        res.status(201).json({ token, newRefreshToken });
+        res
+            .cookie("accessToken", token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                maxAge: 60 * 60 * 1000, // 1 hour
+            })
+            .cookie("refreshToken", newRefreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            })
+            .status(200)
+            .json({ message: "Token refreshed successfully" });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error when trying to create user" });
+        res.status(500).json({ message: "Error refreshing token" });
     }
 });
 
-router.post("/password-recovery", async (req: Request, res: Response) => {
+router.post("/password-recovery", limiter, async (req: Request, res: Response) => {
     try {
-        const { email } = req.body;
+        const { username } = req.body;
+
+        if (!username) {
+            return res.status(400).json({ message: "Nome de usuário é obrigatório" });
+        }
 
         const user = await prisma.users.findUnique({
-            where: {
-                email
-            }
+            where: { username },
         });
 
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.status(404).json({ message: "Usuário não encontrado" });
         }
 
         await prisma.passwordRecoveries.create({
             data: {
                 token: uuidv4(),
                 userId: user.id,
-                expiresAt: new Date(Date.now() + 60 * 60 * 1000) // expires in 1 hour
-            }
+                expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+            },
         });
 
-        // code to send email here:
-
-        res.status(201).json({ message: "Email has been sent" });
+        res.status(201).json({ message: "Token de recuperação criado" });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error when trying to create user" });
+        res.status(500).json({ message: "Erro ao recuperar senha" });
     }
 });
 

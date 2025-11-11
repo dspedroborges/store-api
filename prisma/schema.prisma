@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -25,14 +19,32 @@ enum TransactionStatus {
 }
 
 model Users {
-  id         Int      @id @default(autoincrement())
-  name       String
-  email      String   @unique
-  password   String
-  is_admin   Boolean  @default(false)
-  created_at DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  username  String   @unique
+  password  String
 
-  passwordRecoveries PasswordRecoveries[]
+  passwordRecovery PasswordRecoveries[]
+  logs             Logs[]
+  role             Roles?
+}
+
+model Roles {
+  id          Int           @id @default(autoincrement())
+  userId      Int           @unique
+  name        String        @unique
+  user        Users         @relation(fields: [userId], references: [id])
+  permissions Permissions[]
+}
+
+model Permissions {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  roleId    Int
+  method    String
+  route     String
+
+  role Roles @relation(fields: [roleId], references: [id])
 }
 
 model PasswordRecoveries {
@@ -42,7 +54,7 @@ model PasswordRecoveries {
   userId    Int      @unique
   token     String   @unique
 
-  User Users @relation(fields: [userId], references: [id])
+  user Users @relation(fields: [userId], references: [id])
 }
 
 model RevokedTokens {
@@ -53,9 +65,12 @@ model RevokedTokens {
 model Logs {
   id        Int      @id @default(autoincrement())
   ip        String
+  userId    Int
   path      String
   method    String
   createdAt DateTime @default(now())
+
+  user Users @relation(fields: [userId], references: [id])
 }
 
 model Products {
@@ -109,4 +124,3 @@ model Reviews {
   approved   Boolean @default(false)
   product    Products  @relation(fields: [productId], references: [id])
 }
-

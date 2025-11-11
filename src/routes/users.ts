@@ -1,90 +1,84 @@
-import { Router, Request, Response } from "express";
-import { prisma } from "../utils/prisma";
-import { checkEncryptedPassword, encryptPassword } from "../utils/auth";
-import { authenticate, AuthenticatedRequest } from "../middleware/authenticate";
+import { Router, type Request, type Response } from "express";
+import { prisma } from "../utils/prisma.js";
+import { checkEncryptedPassword, encryptPassword } from "../utils/auth.js";
+import { authenticate, type AuthenticatedRequest } from "../middleware/authenticate.js";
 
 const router = Router();
 
 router.get("/", authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  if (!req.isAdmin) return res.status(403);
-  const users = await prisma.users.findMany({
-    select: {
-      name: true,
-      email: true,
-      created_at: true,
-    }
-  });
-  res.status(201).json(users);
+    if (!req.isAdmin) return res.status(403).json({ message: "Access denied" });
+
+    const users = await prisma.users.findMany({
+        select: {
+            id: true,
+            username: true,
+            createdAt: true,
+        },
+    });
+
+    res.status(200).json(users);
 });
 
 router.get("/:id", authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  const userId = Number(req.params.id);
+    const userId = Number(req.params.id);
 
-  if (userId !== req.authenticatedUserId && !req.isAdmin) return res.status(403);
+    if (userId !== req.authenticatedUserId && !req.isAdmin)
+        return res.status(403).json({ message: "Access denied" });
 
-  const user = await prisma.users.findUnique({
-    where: {
-      id: userId
-    }
-  });
-  res.status(201).json(user);
+    const user = await prisma.users.findUnique({
+        where: { id: userId },
+    });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.status(200).json(user);
 });
 
 router.put("/:id", authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  const { name, email, currentPassword, newPassword } = req.body;
-  const userId = Number(req.params.id);
+    const { username, currentPassword, newPassword } = req.body;
+    const userId = Number(req.params.id);
 
-  if (userId !== req.authenticatedUserId && !req.isAdmin) return res.status(403);
+    if (userId !== req.authenticatedUserId && !req.isAdmin)
+        return res.status(403).json({ message: "Access denied" });
 
-  const user = await prisma.users.findUnique({
-    where: {
-      id: userId
+    const user = await prisma.users.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const usernameExists = await prisma.users.findFirst({
+        where: {
+            username,
+            id: { not: userId },
+        },
+    });
+    if (usernameExists) return res.status(403).json({ message: "Username already in use" });
+
+    if (!req.isAdmin) {
+        const match = await checkEncryptedPassword(currentPassword, user.password);
+        if (!match) return res.status(403).json({ message: "Current password incorrect" });
     }
-  });
 
-  if (!user) return;
+    await prisma.users.update({
+        where: { id: userId },
+        data: {
+            username,
+            password: newPassword ? await encryptPassword(newPassword) : user.password,
+        },
+    });
 
-  const emailAlreadyExists = await prisma.users.findFirst({
-    where: {
-      email,
-      id: {
-        not: userId,
-      }
-    }
-  });
-
-  if (emailAlreadyExists) res.status(403).json({ message: "Email already exists" });
-
-  // only verify if the password match if the user is not admin
-  if (!req.isAdmin) {
-    const match = await checkEncryptedPassword(currentPassword, user?.password);
-    if (!match) res.status(403).json({ message: "Current password is incorrect" });
-  }
-
-  await prisma.users.update({
-    data: {
-      name,
-      email,
-      password: await encryptPassword(newPassword)
-    },
-    where: {
-      id: userId
-    }
-  });
-  res.status(201).json({ message: "User updated" });
+    res.status(200).json({ message: "User updated successfully" });
 });
 
-router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
-  const userId = Number(req.params.id);
+router.delete("/:id", authenticate, async (req: AuthenticatedRequest, res: Response) => {
+    const userId = Number(req.params.id);
 
-  if (userId !== req.authenticatedUserId && !req.isAdmin) return res.status(403);
+    if (userId !== req.authenticatedUserId && !req.isAdmin)
+        return res.status(403).json({ message: "Access denied" });
 
-  await prisma.users.delete({
-    where: {
-      id: userId
-    }
-  });
-  res.status(201).json({ message: "User deleted" });
+    await prisma.users.delete({
+        where: { id: userId },
+    });
+
+    res.status(200).json({ message: "User deleted successfully" });
 });
 
 export default router;

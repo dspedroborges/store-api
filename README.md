@@ -34,16 +34,31 @@ The database schema includes the following models:
 
 ---
 
-## Technologies
-- **Node.js** & **Express.js**
-- **TypeScript**
-- **Prisma ORM** with **PostgreSQL**
-- **JWT** for authentication
-- **bcryptjs** for password hashing
-- **Multer** for file uploads
-- **ts-node-dev** for development
-- **node-cron** for cron jobs
-- **Mercado Pago** to process payments
+## Tech Stack
+
+### Core
+- **Node.js** & **Express.js** – Server and routing framework  
+- **TypeScript** – Type-safe development  
+- **Prisma ORM** + **PostgreSQL** – Database modeling and queries  
+
+### Authentication & Security
+- **JWT (jsonwebtoken)** – Token-based authentication  
+- **bcryptjs** – Password hashing and verification  
+- **cookie-parser** – Parse cookies  
+- **express-rate-limit** – Limit request rates  
+- **xss** – Sanitize input and prevent XSS attacks  
+
+### Utilities
+- **dotenv** – Load environment variables  
+- **uuid** – Generate unique identifiers  
+- **Multer** – Handle file uploads  
+- **node-cron** – Schedule automated tasks  
+
+### Development
+- **ts-node-dev** – Hot-reload TypeScript server during development  
+
+### Integrations
+- **Mercado Pago** – Payment processing
 
 ---
 
