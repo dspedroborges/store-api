@@ -1,5 +1,3 @@
-![Banner](banner.png)
-
 # Store API
 
 ## Project Description
