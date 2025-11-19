@@ -18,6 +18,13 @@ enum TransactionStatus {
   CHARGEBACK
 }
 
+enum RequestStatus {
+  PENDING
+  SHIPPED
+  DELIVERED
+  CANCELED
+}
+
 model Users {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
@@ -27,6 +34,9 @@ model Users {
   passwordRecovery PasswordRecoveries[]
   logs             Logs[]
   role             Roles?
+  addresses        Addresses[]
+  requests         Requests[]
+  cartItems        CartItems[]
 }
 
 model Roles {
@@ -73,9 +83,26 @@ model Logs {
   user Users @relation(fields: [userId], references: [id])
 }
 
+model Addresses {
+  id           Int      @id @default(autoincrement())
+  createdAt    DateTime @default(now())
+  userId       Int
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String
+  zipCode      String
+  country      String
+
+  user Users @relation(fields: [userId], references: [id])
+  requests Requests[]
+}
+
 model Products {
   id           Int             @id @default(autoincrement())
-  createdAt  DateTime  @default(now())
+  createdAt    DateTime        @default(now())
   name         String
   description  String
   price        Int
@@ -84,43 +111,88 @@ model Products {
   images       ProductImages[]
   transactions Transactions[]
   reviews      Reviews[]
+  requests     Requests[]
+  cartItems    CartItems[]
 }
 
 model Discounts {
-  id         Int       @id @default(autoincrement())
-  createdAt  DateTime  @default(now())
-  value      Int
-  productId  Int
-  expiresAt  DateTime
-  product    Products  @relation(fields: [productId], references: [id])
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  value     Int
+  productId Int
+  expiresAt DateTime
+  product   Products @relation(fields: [productId], references: [id])
 }
 
 model ProductImages {
-  id         Int       @id @default(autoincrement())
-  productId  Int
-  url        String
-  product    Products  @relation(fields: [productId], references: [id])
+  id        Int      @id @default(autoincrement())
+  productId Int
+  url       String
+  product   Products @relation(fields: [productId], references: [id])
+}
+
+model ShippingMethods {
+  id            Int      @id @default(autoincrement())
+  name          String
+  type          String?
+  price         Decimal  @db.Decimal(10, 2)
+  estimatedDays Int
+  requests      Requests[]
+}
+
+model Requests {
+  id              Int              @id @default(autoincrement())
+  createdAt       DateTime         @default(now())
+  userId          Int
+  productId       Int
+  transactionId   Int
+  addressId       Int
+  trackingCode    String
+  shippingCost    Decimal          @db.Decimal(10, 2)
+  status          RequestStatus    @default(PENDING)
+  shippingMethodId Int?
+
+  user            Users            @relation(fields: [userId], references: [id])
+  product         Products         @relation(fields: [productId], references: [id])
+  transaction     Transactions     @relation(fields: [transactionId], references: [id])
+  address         Addresses        @relation(fields: [addressId], references: [id])
+  shippingMethod  ShippingMethods? @relation(fields: [shippingMethodId], references: [id])
 }
 
 model Transactions {
-  id         Int       @id @default(autoincrement())
-  productId  Int
-  userId     Int
-  price      Int
-  createdAt  DateTime  @default(now())
-  expiresAt DateTime
-  status     String @default("PENDING")
-  product    Products  @relation(fields: [productId], references: [id])
+  id            Int        @id @default(autoincrement())
+  productId     Int
+  userId        Int
+  price         Decimal    @db.Decimal(10, 2)
+  paymentMethod String
+  createdAt     DateTime   @default(now())
+  expiresAt     DateTime
+  status        String     @default("PENDING")
+
+  product       Products   @relation(fields: [productId], references: [id])
+  requests      Requests[]
+}
+
+model CartItems {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  user    Users    @relation(fields: [userId], references: [id])
+  product Products @relation(fields: [productId], references: [id])
 }
 
 model Reviews {
-  id         Int       @id @default(autoincrement())
-  createdAt  DateTime  @default(now())
-  userId     Int
-  productId  Int
-  title      String
-  content    String
-  rating     Int
-  approved   Boolean @default(false)
-  product    Products  @relation(fields: [productId], references: [id])
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  userId    Int
+  productId Int
+  title     String
+  content   String
+  rating    Int
+  approved  Boolean  @default(false)
+
+  product   Products @relation(fields: [productId], references: [id])
 }
